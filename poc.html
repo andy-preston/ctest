@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<title>CH340G in a Browser - Proof of Concept</title>
+<style>
+    body {
+        font-family: sans-serif;
+    }
+    p#marquee {
+        border-width: 1px;
+        border-style: solid;
+        padding: 3px;
+    }
+</style>
+</head>
+<body>
+<p>This code is just a POC, nobody would be prepared to describe it as
+&quot;robust&quot;.</p>
+<p>But if you
+<button id="click-bait" type="button">Click this 'ere button</button>
+an endless marquee of test data should start streaming from the test device...
+right here:</p>
+<p id="marquee">&nbsp;</p>
+<script>
+window.addEventListener(
+    "load",
+    () => {
+        const getReader = async () => {
+            const port = await navigator.serial.requestPort({
+                "filters": [
+                    { "usbVendorId": 0x1A86, "usbProductId": 0x7523 }
+                ]
+            });
+            await port.open({ "baudRate": 9600 });
+            return port.readable.getReader();
+        }
+
+        const decoder = new TextDecoder();
+
+        const read = async (reader) => {
+            const { value, done } = await reader.read();
+            if (done) {
+                reader.releaseLock();
+                return null;
+            }
+            return decoder.decode(value)
+        }
+
+        var text = "";
+
+        const trimText = (newText, size) => {
+            text = text + newText
+            return text.length > size ? text.slice(-size) : text;
+        }
+
+        document.getElementById("click-bait").addEventListener(
+            "click",
+            async () => {
+                const reader = await getReader();
+                const marquee = document.getElementById("marquee");
+                var newText;
+                do {
+                    newText = await read(reader);
+                    if (newText) {
+                        marquee.innerText = trimText(newText, 180);
+                    }
+                } while (newText !== null);
+            }
+        );
+    }
+);
+</script>
+</body>
+</html>
